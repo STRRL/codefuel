@@ -27,6 +27,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/debug": "^4.1.12",
     "@types/pg": "^8.15.4",
     "@types/yargs": "^17.0.33",
     "drizzle-kit": "^0.31.4",

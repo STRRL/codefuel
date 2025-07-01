@@ -3,6 +3,7 @@ import { hideBin } from "yargs/helpers";
 import { handleUsageCommand } from "./commands/usage.js";
 import { handleAppsCommand } from "./commands/apps.js";
 import { handleBatchCollectCommand } from "./commands/batch-collect.js";
+import { handleBatchAppsCommand } from "./commands/batch-apps.js";
 
 async function run() {
   await yargs(hideBin(process.argv))
@@ -37,6 +38,9 @@ async function run() {
     .command('batch-collect', 'Run batch collection for all models and apps', (yargs) => {
       return yargs;
     }, handleBatchCollectCommand)
+    .command('batch-apps', 'Update app metadata (categories) for apps missing them', (yargs) => {
+      return yargs;
+    }, handleBatchAppsCommand)
     .demandCommand(1, 'You must specify a command')
     .help()
     .argv;
