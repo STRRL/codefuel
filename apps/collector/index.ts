@@ -2,123 +2,112 @@ import { Stagehand, Page, BrowserContext } from "@browserbasehq/stagehand";
 import StagehandConfig from "./stagehand.config.js";
 import chalk from "chalk";
 import boxen from "boxen";
-import { drawObserveOverlay, clearOverlays, actWithCache } from "./utils.js";
 import { z } from "zod";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-/**
- * 🤘 Welcome to Stagehand! Thanks so much for trying us out!
- * 🛠️ CONFIGURATION: stagehand.config.ts will help you configure Stagehand
- *
- * 📝 Check out our docs for more fun use cases, like building agents
- * https://docs.stagehand.dev/
- *
- * 💬 If you have any feedback, reach out to us on Slack!
- * https://stagehand.dev/slack
- *
- * 📚 You might also benefit from the docs for Zod, Browserbase, and Playwright:
- * - https://zod.dev/
- * - https://docs.browserbase.com/
- * - https://playwright.dev/docs/intro
- */
-async function main({
-  page,
-  context,
-  stagehand,
-}: {
-  page: Page; // Playwright Page with act, extract, and observe methods
-  context: BrowserContext; // Playwright BrowserContext
-  stagehand: Stagehand; // Stagehand instance
-}) {
-  // Navigate to a URL
-  await page.goto("https://docs.stagehand.dev/reference/introduction");
+const AppSchema = z.object({
+  name: z.string(),
+  url: z.string(),
+  tokensUsed: z.string(),
+});
 
-  // Use act() to take actions on the page
-  await page.act("Click the search box");
+const AppsArraySchema = z.array(AppSchema);
 
-  // Use observe() to plan an action before doing it
-  const [action] = await page.observe(
-    "Type 'Tell me in one sentence why I should use Stagehand' into the search box",
-  );
-  await drawObserveOverlay(page, [action]); // Highlight the search box
-  await page.waitForTimeout(1_000);
-  await clearOverlays(page); // Remove the highlight before typing
-  await page.act(action); // Take the action
-
-  // For more on caching, check out our docs: https://docs.stagehand.dev/examples/caching
-  await page.waitForTimeout(1_000);
-  await actWithCache(page, "Click the suggestion to use AI");
-  await page.waitForTimeout(5_000);
-
-  // Use extract() to extract structured data from the page
-  const { text } = await page.extract({
-    instruction:
-      "extract the text of the AI suggestion from the search results",
-    schema: z.object({
-      text: z.string(),
-    }),
-  });
-  stagehand.log({
-    category: "create-browser-app",
-    message: `Got AI Suggestion`,
-    auxiliary: {
-      text: {
-        value: text,
-        type: "string",
-      },
-    },
-  });
-  stagehand.log({
-    category: "create-browser-app",
-    message: `Metrics`,
-    auxiliary: {
-      metrics: {
-        value: JSON.stringify(stagehand.metrics),
-        type: "object",
-      },
-    },
-  });
+// Function to convert token abbreviations to numeric values
+function convertTokensToNumber(tokenStr: string): string {
+  const match = tokenStr.match(/^(\d+(?:\.\d+)?)\s*([BMK]?)$/i);
+  if (!match) return tokenStr;
+  
+  const [, numStr, unit] = match;
+  const num = parseFloat(numStr);
+  
+  let multiplier = 1;
+  switch (unit.toUpperCase()) {
+    case 'B':
+      multiplier = 1_000_000_000;
+      break;
+    case 'M':
+      multiplier = 1_000_000;
+      break;
+    case 'K':
+      multiplier = 1_000;
+      break;
+  }
+  
+  const result = Math.round(num * multiplier);
+  return result.toLocaleString();
 }
 
-/**
- * This is the main function that runs when you do npm run start
- *
- * YOU PROBABLY DON'T NEED TO MODIFY ANYTHING BELOW THIS POINT!
- *
- */
+async function main({
+  page,
+  stagehand,
+  outputFile,
+}: {
+  page: Page;
+  stagehand: Stagehand;
+  outputFile?: string;
+}) {
+  // Navigate to the OpenRouter Claude Sonnet apps page
+  await page.goto("https://openrouter.ai/anthropic/claude-sonnet-4/apps");
+  
+  // Wait for the page to load
+  await page.waitForTimeout(3000);
+  
+  // Extract all apps data
+  const result = await page.extract({
+    instruction: "Extract all apps information. For each app card/item on the page, get: 1) The app name, 2) The full HTTP/HTTPS URL or website link associated with the app (not just numbers or IDs, but actual website URLs like https://openrouter.ai/apps?url=https%3A%2F%2Fcline.bot%2F), 3) The tokens used value. If no full URL is visible, extract any domain name or website reference.",
+    schema: z.object({
+      apps: AppsArraySchema
+    }),
+  });
+  
+  const appsData = result.apps;
+  
+  // Save to file if output option is provided
+  if (outputFile) {
+    // Convert token values to numbers before saving
+    const processedData = appsData.map(app => ({
+      ...app,
+      tokensUsed: convertTokensToNumber(app.tokensUsed)
+    }));
+    
+    const jsonOutput = JSON.stringify(processedData, null, 2);
+    
+    // Write to file using Node.js fs
+    const fs = await import('fs/promises');
+    await fs.writeFile(outputFile, jsonOutput);
+  }
+}
+
 async function run() {
+  const argv = await yargs(hideBin(process.argv))
+    .option('output', {
+      alias: 'o',
+      type: 'string',
+      description: 'Output file path for saving the collected data as JSON'
+    })
+    .help()
+    .argv;
+
   const stagehand = new Stagehand({
     ...StagehandConfig,
   });
   await stagehand.init();
 
-  if (StagehandConfig.env === "BROWSERBASE" && stagehand.browserbaseSessionID) {
-    console.log(
-      boxen(
-        `View this session live in your browser: \n${chalk.blue(
-          `https://browserbase.com/sessions/${stagehand.browserbaseSessionID}`,
-        )}`,
-        {
-          title: "Browserbase",
-          padding: 1,
-          margin: 3,
-        },
-      ),
-    );
-  }
-
   const page = stagehand.page;
-  const context = stagehand.context;
-  await main({
-    page,
-    context,
-    stagehand,
-  });
-  await stagehand.close();
-  console.log(
-    `\n🤘 Thanks so much for using Stagehand! Reach out to us on Slack if you have any feedback: ${chalk.blue(
-      "https://stagehand.dev/slack",
-    )}\n`,
-  );
+  try {
+    await main({
+      page,
+      stagehand,
+      outputFile: argv.output,
+    });
+  } catch (error) {
+    console.error(chalk.red("❌ Error occurred:"), error);
+  } finally {
+    await stagehand.close();
+  }
+  
 }
 
 run();

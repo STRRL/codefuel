@@ -3,7 +3,8 @@
     "allow": [
       "Bash(pnpm init:*)",
       "Bash(mkdir:*)",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": []
   }
