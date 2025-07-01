@@ -104,7 +104,7 @@ export async function handleBatchAppsCommand(argv: any) {
     await stagehand.init();
     
     try {
-      debug("🔄 Updating app metadata (category)...");
+      debug("🔄 Updating app metadata (description and category)...");
       
       const metadataUpdates = [];
       const concurrencyLimit = 5;
@@ -119,13 +119,36 @@ export async function handleBatchAppsCommand(argv: any) {
         const batchResults = await Promise.all(
           batch.map(async (app) => {
             try {
-              const categoryResult = await extractAppCategory(stagehand, app.url);
-              return {
-                id: app.id,
-                category: categoryResult.category,
-              };
+              // Parallel fetch both if needed
+              const tasks = [];
+              const needsDescription = !app.description;
+              const needsCategory = !app.category;
+              
+              if (needsDescription) {
+                tasks.push(extractAppDescription(stagehand, app.url));
+              }
+              if (needsCategory) {
+                tasks.push(extractAppCategory(stagehand, app.url));
+              }
+              
+              const results = await Promise.all(tasks);
+              
+              // Build update object
+              const update: any = { id: app.id };
+              
+              if (needsDescription && results[0]) {
+                update.description = (results[0] as any).description;
+              }
+              if (needsCategory) {
+                const categoryIdx = needsDescription ? 1 : 0;
+                if (results[categoryIdx]) {
+                  update.category = (results[categoryIdx] as any).category;
+                }
+              }
+              
+              return update;
             } catch (error) {
-              debugError(`❌ Failed to collect category for ${app.url}:`, error);
+              debugError(`❌ Failed to collect metadata for ${app.url}:`, error);
               return null;
             }
           })
@@ -133,15 +156,16 @@ export async function handleBatchAppsCommand(argv: any) {
         metadataUpdates.push(...batchResults);
       }
       
-      // Update apps with category
+      // Update apps with metadata
       for (const update of metadataUpdates) {
-        if (update) {
+        if (update && (update.description || update.category)) {
           try {
+            const updateData: any = { updatedAt: new Date() };
+            if (update.description) updateData.description = update.description;
+            if (update.category) updateData.category = update.category;
+            
             await db.update(apps)
-              .set({ 
-                category: update.category,
-                updatedAt: new Date()
-              })
+              .set(updateData)
               .where(eq(apps.id, update.id));
             successCount++;
           } catch (error) {
