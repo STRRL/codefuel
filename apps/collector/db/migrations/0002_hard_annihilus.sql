@@ -1,0 +1,1 @@
+CREATE INDEX "apps_category_idx" ON "apps" USING btree ("category");

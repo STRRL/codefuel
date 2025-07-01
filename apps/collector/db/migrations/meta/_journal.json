@@ -15,6 +15,13 @@
       "when": 1751350478102,
       "tag": "0001_friendly_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1751350988110,
+      "tag": "0002_hard_annihilus",
+      "breakpoints": true
     }
   ]
 }

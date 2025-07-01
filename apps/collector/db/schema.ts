@@ -16,7 +16,9 @@ export const apps = pgTable('apps', {
   tokensUsed: text('tokens_used'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  categoryIdx: index('apps_category_idx').on(table.category),
+}));
 
 export const collectBatch = pgTable('collect_batch', {
   id: serial('id').primaryKey(),
