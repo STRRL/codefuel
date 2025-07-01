@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm init:*)"
+      "Bash(pnpm init:*)",
+      "Bash(mkdir:*)",
+      "Bash(pnpm install:*)"
     ],
     "deny": []
   }
