@@ -40,13 +40,15 @@ async function collectUsage({
   page,
   stagehand,
   outputFile,
+  model,
 }: {
   page: Page;
   stagehand: Stagehand;
   outputFile?: string;
+  model: string;
 }) {
-  // Navigate to the OpenRouter Claude Sonnet apps page
-  await page.goto("https://openrouter.ai/anthropic/claude-sonnet-4/apps");
+  // Navigate to the OpenRouter model apps page
+  await page.goto(`https://openrouter.ai/${model}/apps`);
   
   // Wait for the page to load
   await page.waitForTimeout(3000);
@@ -89,6 +91,7 @@ export async function handleUsageCommand(argv: any) {
       page,
       stagehand,
       outputFile: argv.output,
+      model: argv.model,
     });
   } catch (error) {
     console.error(chalk.red("❌ Error occurred:"), error);
