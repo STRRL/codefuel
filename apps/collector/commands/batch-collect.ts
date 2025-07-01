@@ -5,17 +5,11 @@ import { db } from "../db/index.js";
 import { models, apps, collectBatch, appUsageHistory } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import createDebug from "debug";
+import { PREDEFINED_MODELS } from "../config/predefined-models.js";
 
 const debug = createDebug("collector:batch-collect");
 const debugInfo = createDebug("collector:batch-collect:info");
 const debugError = createDebug("collector:batch-collect:error");
-
-// Predefined models to ensure they exist in database
-const PREDEFINED_MODELS = [
-  { displayName: "Anthropic: Claude 3.7 Sonnet", modelName: "anthropic/claude-3.7-sonnet" },
-  { displayName: "Anthropic: Claude 3.5 Sonnet", modelName: "anthropic/claude-3.5-sonnet" },
-  { displayName: "Anthropic: Claude Sonnet 4", modelName: "anthropic/claude-sonnet-4" },
-];
 
 const AppSchema = z.object({
   name: z.string(),
