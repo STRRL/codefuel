@@ -65,7 +65,7 @@ export async function handleStatsCommand(argv: any) {
     const urlToCategoryMap = new Map<string, string>();
     
     for (const app of allApps) {
-      urlToCategoryMap.set(app.url, app.category || "Uncategorized");
+      urlToCategoryMap.set(app.url, app.category || "Others");
     }
     
     // Step 4: Aggregate tokens by category
@@ -73,7 +73,7 @@ export async function handleStatsCommand(argv: any) {
     let totalTokensAllCategories = 0;
     
     for (const usage of usageHistory) {
-      const category = urlToCategoryMap.get(usage.appUrl) || "Uncategorized";
+      const category = urlToCategoryMap.get(usage.appUrl) || "Others";
       const tokens = parseTokenString(usage.tokensUsed);
       totalTokensAllCategories += tokens;
       
