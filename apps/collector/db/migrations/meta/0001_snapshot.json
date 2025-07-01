@@ -1,6 +1,6 @@
 {
-  "id": "fc76781e-4716-4d25-a884-f9746549e953",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "2333b9fe-d9f8-4c11-9556-d63ba8107ba1",
+  "prevId": "fc76781e-4716-4d25-a884-f9746549e953",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -58,7 +58,53 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "app_usage_history_collect_batch_id_idx": {
+          "name": "app_usage_history_collect_batch_id_idx",
+          "columns": [
+            {
+              "expression": "collect_batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "app_usage_history_model_name_idx": {
+          "name": "app_usage_history_model_name_idx",
+          "columns": [
+            {
+              "expression": "model_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "app_usage_history_app_name_idx": {
+          "name": "app_usage_history_app_name_idx",
+          "columns": [
+            {
+              "expression": "app_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

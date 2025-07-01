@@ -1,6 +1,9 @@
 CREATE TABLE "app_usage_history" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"app_id" integer NOT NULL,
+	"app_name" text NOT NULL,
+	"app_url" text NOT NULL,
+	"model_display_name" text NOT NULL,
+	"model_name" text NOT NULL,
 	"collect_batch_id" integer NOT NULL,
 	"tokens_used" text NOT NULL,
 	"recorded_at" timestamp DEFAULT now() NOT NULL
@@ -20,8 +23,7 @@ CREATE TABLE "apps" (
 --> statement-breakpoint
 CREATE TABLE "collect_batch" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"collected_at" timestamp DEFAULT now() NOT NULL,
-	"total_apps_collected" integer NOT NULL
+	"collected_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "models" (

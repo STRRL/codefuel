@@ -1,7 +1,9 @@
 import { Stagehand } from "@browserbasehq/stagehand";
 import StagehandConfig from "../stagehand.config.js";
-import chalk from "chalk";
 import { z } from "zod";
+import createDebug from "debug";
+
+const debugError = createDebug("collector:apps:error");
 
 const AppDetailsSchema = z.object({
   name: z.string(),
@@ -97,7 +99,7 @@ export async function handleAppsCommand(argv: any) {
       outputFile: argv.output,
     });
   } catch (error) {
-    console.error(chalk.red("❌ Error occurred:"), error);
+    debugError("❌ Error occurred:", error);
   } finally {
     await stagehand.close();
   }

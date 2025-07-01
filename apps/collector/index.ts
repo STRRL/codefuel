@@ -2,6 +2,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { handleUsageCommand } from "./commands/usage.js";
 import { handleAppsCommand } from "./commands/apps.js";
+import { handleBatchCollectCommand } from "./commands/batch-collect.js";
 
 async function run() {
   await yargs(hideBin(process.argv))
@@ -33,6 +34,9 @@ async function run() {
           description: 'Output file path for saving the collected data as JSON'
         });
     }, handleAppsCommand)
+    .command('batch-collect', 'Run batch collection for all models and apps', (yargs) => {
+      return yargs;
+    }, handleBatchCollectCommand)
     .demandCommand(1, 'You must specify a command')
     .help()
     .argv;

@@ -18,7 +18,7 @@ const StagehandConfig: ConstructorParams = {
   // LLM configuration
 
   llmClient: new AISdkClient({
-    model: openrouter("deepseek/deepseek-chat-v3-0324:free"),
+    model: openrouter(process.env.OPENROUTER_MODEL_NAME || "deepseek/deepseek-chat-v3-0324:free"),
   }),
 
   // Browser configuration
@@ -38,6 +38,7 @@ const StagehandConfig: ConstructorParams = {
     },
   },
   localBrowserLaunchOptions: {
+    headless: true,
     viewport: {
       width: 1024,
       height: 768,
