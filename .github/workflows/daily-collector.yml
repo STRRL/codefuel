@@ -63,3 +63,8 @@ jobs:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         OPENROUTER_MODEL_NAME: ${{ secrets.OPENROUTER_MODEL_NAME }}
+    
+    - name: Generate stats
+      run: cd apps/collector && node dist/index.js stats
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
