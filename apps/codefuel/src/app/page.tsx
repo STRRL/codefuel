@@ -1,27 +1,90 @@
 import Link from "next/link";
-import { getTopApps, getUsageHistory } from "@/lib/db";
+import { getTopApps, db, collectBatch, appUsageHistory, apps } from "@/lib/db";
+import { desc, eq } from "drizzle-orm";
 
-async function getTotalTokens() {
-  const usageHistory = await getUsageHistory(1000);
+async function getLatestBatch() {
+  const result = await db
+    .select()
+    .from(collectBatch)
+    .orderBy(desc(collectBatch.collectedAt))
+    .limit(1);
   
-  let totalTokens = 0;
-  usageHistory.forEach(entry => {
-    const tokens = entry.tokensUsed.replace(/,/g, '');
-    const numTokens = parseInt(tokens) || 0;
-    totalTokens += numTokens;
-  });
-  
-  return totalTokens;
+  return result[0];
 }
 
+async function getUsageHistoryByBatch(batchId: number) {
+  const result = await db
+    .select()
+    .from(appUsageHistory)
+    .where(eq(appUsageHistory.collectBatchId, batchId));
+  
+  return result;
+}
+
+
 async function getActiveApps() {
-  const apps = await getTopApps(100);
-  return apps.length;
+  const latestBatch = await getLatestBatch();
+  if (!latestBatch) return 0;
+  
+  const usageHistory = await getUsageHistoryByBatch(latestBatch.id);
+  const uniqueApps = new Set(usageHistory.map(entry => entry.appName));
+  
+  return uniqueApps.size;
+}
+
+async function getTotalTokens() {
+  const latestBatch = await getLatestBatch();
+  if (!latestBatch) return 0;
+  
+  const allUsageHistory = await getUsageHistoryByBatch(latestBatch.id);
+  
+  let totalGlobalTokens = 0;
+  allUsageHistory.forEach(entry => {
+    const tokens = entry.tokensUsed.replace(/,/g, '');
+    const numTokens = parseInt(tokens) || 0;
+    totalGlobalTokens += numTokens;
+  });
+
+  return totalGlobalTokens;
+}
+
+async function getCodingTokens() {
+  const latestBatch = await getLatestBatch();
+  if (!latestBatch) return 0;
+  
+  const usageHistory = await getUsageHistoryByBatch(latestBatch.id);
+  
+  // Filter for coding-related apps only
+  const codingApps = await db
+    .select()
+    .from(apps)
+    .where(eq(apps.category, 'Coding'));
+  
+  const codingAppNames = new Set(codingApps.map(app => app.name));
+  
+  let codingTokens = 0;
+  usageHistory.forEach(entry => {
+    if (codingAppNames.has(entry.appName)) {
+      const tokens = entry.tokensUsed.replace(/,/g, '');
+      const numTokens = parseInt(tokens) || 0;
+      codingTokens += numTokens;
+    }
+  });
+  
+  return codingTokens;
+}
+
+function calculatePercentage(codingTokens: number, totalGlobalTokens: number) {
+  if (totalGlobalTokens === 0) return 0;
+  const percentage = (codingTokens / totalGlobalTokens) * 100;
+  return Math.round(percentage * 10) / 10; // Round to 1 decimal place
 }
 
 export default async function Home() {
-  const totalTokens = await getTotalTokens();
+  const codingTokens = await getCodingTokens();
   const activeApps = await getActiveApps();
+  const totalTokens = await getTotalTokens();
+  const percentage = calculatePercentage(codingTokens, totalTokens);
   
   const formatNumber = (num: number) => {
     if (num >= 1000000000) {
@@ -37,33 +100,39 @@ export default async function Home() {
   return (
     <div className="space-y-16">
       {/* Hero Section */}
-      <div className="text-center space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 tracking-tight">
-            AI Coding is Eating Software
-          </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">
-            Tokens are the new gas powering the future of software development
-          </p>
+      <div className="space-y-12">
+        <div className="space-y-8">
+          <div className="space-y-2">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900">
+              <span className="text-blue-600">{formatNumber(codingTokens)}</span>{" "}
+              <span className="text-gray-900">tokens being consumed by AI coding tools</span>
+            </h1>
+            <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-700 max-w-5xl leading-tight">
+              That's approximately{" "}
+              <span className="text-blue-600">{percentage}%</span>{" "}
+              of all AI token consumption globally
+            </p>
+          </div>
+          <div className="pt-8 border-t border-gray-200">
+            <p className="text-xl sm:text-2xl md:text-3xl font-medium text-gray-800 max-w-4xl leading-relaxed">
+              AI coding is eating software. Tokens are the new gas powering the future of software development.
+            </p>
+          </div>
         </div>
         
-        <div className="bg-blue-50 rounded-2xl p-8 max-w-4xl mx-auto">
+        <div className="bg-gray-100 rounded-2xl p-8 max-w-4xl">
           <p className="text-lg text-gray-700 mb-6">
-            Currently, there are{" "}
-            <span className="text-4xl font-bold text-blue-600">
-              {formatNumber(totalTokens)}
-            </span>{" "}
-            tokens being consumed by AI coding tools
+            Tracking token consumption across hundreds of AI coding applications
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg p-6">
               <div className="text-3xl font-bold text-gray-900">{activeApps}+</div>
-              <div className="text-gray-600">Active Coding Apps</div>
+              <div className="text-gray-600">AI Apps</div>
             </div>
             <div className="bg-white rounded-lg p-6">
-              <div className="text-3xl font-bold text-gray-900">24/7</div>
-              <div className="text-gray-600">Continuous Tracking</div>
+              <div className="text-3xl font-bold text-gray-900">{formatNumber(totalTokens)}</div>
+              <div className="text-gray-600">Total Tokens</div>
             </div>
           </div>
         </div>
@@ -97,11 +166,11 @@ export default async function Home() {
           <div className="text-center">
             <div className="text-5xl mb-4">📊</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Track the Revolution
+              Data-Driven Insights
             </h3>
             <p className="text-gray-600">
-              Monitor real-time token consumption across hundreds of AI coding 
-              tools and understand usage patterns.
+              Analyze token consumption patterns across hundreds of AI coding 
+              tools and discover usage trends.
             </p>
           </div>
         </div>
@@ -153,9 +222,9 @@ export default async function Home() {
           </div>
           <div>
             <div className="text-4xl font-bold text-green-600 mb-2">
-              Live
+              Daily
             </div>
-            <div className="text-gray-600">Real-time Tracking</div>
+            <div className="text-gray-600">Data Updates</div>
           </div>
         </div>
       </div>
