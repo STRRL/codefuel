@@ -1,0 +1,70 @@
+name: Daily Collector
+
+on:
+  schedule:
+    # Run daily at 6:00 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  collect-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+    
+    - name: Install dependencies
+      run: pnpm install
+    
+    - name: Build collector
+      run: cd apps/collector && pnpm build
+    
+    - name: Check required environment variables
+      run: |
+        if [ -z "$OPENROUTER_API_KEY" ]; then
+          echo "Error: OPENROUTER_API_KEY is not set"
+          exit 1
+        fi
+        if [ -z "$OPENROUTER_MODEL_NAME" ]; then
+          echo "Error: OPENROUTER_MODEL_NAME is not set"
+          exit 1
+        fi
+        if [ -z "$DATABASE_URL" ]; then
+          echo "Error: DATABASE_URL is not set"
+          exit 1
+        fi
+        echo "All required environment variables are set"
+      env:
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        OPENROUTER_MODEL_NAME: ${{ secrets.OPENROUTER_MODEL_NAME }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    
+    - name: Run batch collection
+      run: cd apps/collector && node dist/index.js batch-collect
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        OPENROUTER_MODEL_NAME: ${{ secrets.OPENROUTER_MODEL_NAME }}
+    
+    - name: Update app metadata
+      run: cd apps/collector && node dist/index.js batch-apps
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        OPENROUTER_MODEL_NAME: ${{ secrets.OPENROUTER_MODEL_NAME }}
+    
+    - name: Generate stats
+      run: cd apps/collector && node dist/index.js stats
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
