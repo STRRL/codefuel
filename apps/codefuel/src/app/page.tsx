@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTopApps, db, collectBatch, appUsageHistory, apps } from "@/lib/db";
+import { db, collectBatch, appUsageHistory, apps } from "@/lib/db";
 import { desc, eq } from "drizzle-orm";
 
 async function getLatestBatch() {
@@ -108,7 +108,7 @@ export default async function Home() {
               <span className="text-gray-900">tokens being consumed by AI coding tools</span>
             </h1>
             <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-700 max-w-5xl leading-tight">
-              That's approximately{" "}
+              That&apos;s approximately{" "}
               <span className="text-blue-600">{percentage}%</span>{" "}
               of all AI token consumption globally
             </p>
