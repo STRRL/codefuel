@@ -1,4 +1,5 @@
-import { getUsageHistory, type AppUsageHistory } from "@/lib/db";
+import { getUsageHistory, type AppUsageHistory, db, apps } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 async function getWeeklyTrends() {
   const usageHistory = await getUsageHistory(1000);
@@ -51,25 +52,70 @@ async function getTopAppsByTokens() {
     return acc;
   }, {} as Record<string, number>);
   
-  return Object.entries(appTokens)
+  const topApps = Object.entries(appTokens)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10)
     .map(([app, tokens]) => ({ app, tokens }));
+
+  // Get category and URL information for each app
+  const appsWithCategories = await Promise.all(
+    topApps.map(async (appData) => {
+      const appInfo = await db.select().from(apps).where(eq(apps.name, appData.app)).limit(1);
+      return {
+        ...appData,
+        category: appInfo[0]?.category || 'Unknown',
+        url: appInfo[0]?.url || null
+      };
+    })
+  );
+
+  return appsWithCategories;
 }
 
 async function getTopModelsByTokens() {
   const usageHistory = await getUsageHistory(1000);
   
-  const modelTokens = usageHistory.reduce((acc, entry) => {
+  const modelData = usageHistory.reduce((acc, entry) => {
     const tokens = parseInt(entry.tokensUsed.replace(/,/g, '')) || 0;
-    acc[entry.modelDisplayName] = (acc[entry.modelDisplayName] || 0) + tokens;
+    const displayName = entry.modelDisplayName;
+    const modelName = entry.modelName;
+    
+    if (!acc[displayName]) {
+      acc[displayName] = {
+        tokens: 0,
+        modelName: modelName
+      };
+    }
+    acc[displayName].tokens += tokens;
+    
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { tokens: number; modelName: string }>);
   
-  return Object.entries(modelTokens)
-    .sort(([, a], [, b]) => b - a)
+  return Object.entries(modelData)
+    .sort(([, a], [, b]) => b.tokens - a.tokens)
     .slice(0, 10)
-    .map(([model, tokens]) => ({ model, tokens }));
+    .map(([displayName, data]) => ({ 
+      model: displayName, 
+      tokens: data.tokens,
+      modelName: data.modelName
+    }));
+}
+
+function getCategoryColor(category: string) {
+  const colors = {
+    'Coding': 'bg-blue-100 text-blue-800',
+    'Marketing': 'bg-green-100 text-green-800',
+    'Personal Assistant': 'bg-purple-100 text-purple-800',
+    'Roleplay': 'bg-pink-100 text-pink-800',
+    'Translation': 'bg-indigo-100 text-indigo-800',
+    'Others': 'bg-yellow-100 text-yellow-800',
+    'Unknown': 'bg-gray-100 text-gray-800'
+  };
+  return colors[category as keyof typeof colors] || colors.Unknown;
+}
+
+function getOpenRouterUrl(modelName: string) {
+  return `https://openrouter.ai/${modelName}/activity`;
 }
 
 export default async function TrendingPage() {
@@ -87,6 +133,10 @@ export default async function TrendingPage() {
     }
     return num.toString();
   };
+
+  // Calculate max tokens for percentage bars
+  const maxAppTokens = topApps.length > 0 ? Math.max(...topApps.map(app => app.tokens)) : 0;
+  const maxModelTokens = topModels.length > 0 ? Math.max(...topModels.map(model => model.tokens)) : 0;
 
   return (
     <div className="space-y-8">
@@ -118,7 +168,7 @@ export default async function TrendingPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-gray-900">
                     {formatNumber(week.totalTokens)}
                   </div>
                   <div className="text-sm text-gray-500">tokens</div>
@@ -139,31 +189,55 @@ export default async function TrendingPage() {
       {/* Top Apps */}
       <div className="bg-white rounded-2xl p-8 shadow-sm">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Top Apps by Token Usage
+          Top Apps
         </h2>
         
         {topApps.length > 0 ? (
           <div className="space-y-3">
-            {topApps.map((app, index) => (
-              <div key={app.app} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{app.app}</div>
+            {topApps.map((app, index) => {
+              const percentage = maxAppTokens > 0 ? (app.tokens / maxAppTokens) * 100 : 0;
+              return (
+                <div key={app.app} className="relative overflow-hidden rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg relative">
+                    {/* Progress bar background */}
+                    <div 
+                      className="absolute inset-0 bg-gray-900 opacity-10 transition-all duration-300 rounded-lg"
+                      style={{ width: `${percentage}%` }}
+                    />
+                    <div className="flex items-center space-x-4 relative z-10">
+                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-gray-700">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        {app.url ? (
+                          <a 
+                            href={app.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+                          >
+                            {app.app}
+                          </a>
+                        ) : (
+                          <div className="font-semibold text-gray-900">{app.app}</div>
+                        )}
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                          {app.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right relative z-10">
+                      <div className="text-xl font-bold text-gray-900">
+                        {formatNumber(app.tokens)}
+                      </div>
+                      <div className="text-sm text-gray-500">tokens</div>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-blue-600">
-                    {formatNumber(app.tokens)}
-                  </div>
-                  <div className="text-sm text-gray-500">tokens</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">
@@ -175,31 +249,48 @@ export default async function TrendingPage() {
       {/* Top Models */}
       <div className="bg-white rounded-2xl p-8 shadow-sm">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Top Models by Token Usage
+          Top Models
         </h2>
         
         {topModels.length > 0 ? (
           <div className="space-y-3">
-            {topModels.map((model, index) => (
-              <div key={model.model} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold text-purple-600">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{model.model}</div>
+            {topModels.map((model, index) => {
+              const percentage = maxModelTokens > 0 ? (model.tokens / maxModelTokens) * 100 : 0;
+              return (
+                <div key={model.model} className="relative overflow-hidden rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg relative">
+                    {/* Progress bar background */}
+                    <div 
+                      className="absolute inset-0 bg-gray-800 opacity-15 transition-all duration-300 rounded-lg"
+                      style={{ width: `${percentage}%` }}
+                    />
+                    <div className="flex items-center space-x-4 relative z-10">
+                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-gray-700">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div>
+                        <a 
+                          href={getOpenRouterUrl(model.modelName)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+                        >
+                          {model.model}
+                        </a>
+                      </div>
+                    </div>
+                    <div className="text-right relative z-10">
+                      <div className="text-xl font-bold text-gray-900">
+                        {formatNumber(model.tokens)}
+                      </div>
+                      <div className="text-sm text-gray-500">tokens</div>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-purple-600">
-                    {formatNumber(model.tokens)}
-                  </div>
-                  <div className="text-sm text-gray-500">tokens</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">

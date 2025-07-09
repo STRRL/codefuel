@@ -9,6 +9,8 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm lint:*)",
       "Bash(find:*)",
+      "Bash(pnpm db:studio:*)",
+      "Bash(npx tsx:*)",
       "Bash(git worktree:*)"
     ],
     "deny": []
